@@ -1,0 +1,98 @@
+// ==UserScript==
+// @name         YouTube Open Quality Menu (Alt+Shift+Q)
+// @version      37.1
+// @description  New Design Embed'deki 2. Alt+T ve odaklanma sorununu çözer.
+// @author       Gemini
+// @match        *://www.youtube.com/*
+// @match        *://www.youtube-nocookie.com/*
+// @grant        none
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    // 1. MAVİ KAREYİ VE TOOLTIP BUG'INI CSS İLE ENGELLE
+    const style = document.createElement('style');
+    style.innerHTML = `
+        *:focus, .ytp-focused, .ytp-settings-button:focus, .ytp-menuitem:focus {
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        .ytp-tooltip.ytp-bottom { pointer-events: none !important; }
+    `;
+    document.head.appendChild(style);
+
+    function resetSettingsTooltip(btn) {
+        if (!btn) return;
+        btn.blur();
+        // Mouse'u butondan çekmişiz gibi yap (Tooltip'i kapatır)
+        btn.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true, cancelable: true, view: window }));
+        btn.setAttribute('aria-expanded', 'false');
+
+        // --- KRİTİK HAMLE: Odağı videonun kendisine ver ---
+        const player = document.querySelector('.html5-video-player') || document.querySelector('#movie_player');
+        if (player) player.focus();
+    }
+
+    function openQualityMenu() {
+        const settingsBtn = document.querySelector('.ytp-settings-button') ||
+                            document.querySelector('[aria-label*="Settings"]') ||
+                            document.querySelector('[aria-label*="Ayarlar"]');
+
+        if (!settingsBtn) return;
+
+        // --- TOGGLE (Aç/Kapat) ---
+        const menu = document.querySelector('.ytp-settings-menu');
+        const isMenuOpen = menu && menu.style.display !== 'none';
+
+        if (isMenuOpen) {
+            settingsBtn.click(); // Menüyü kapat
+            // Menü kapandıktan sonra odağı videoya kaçır (Böylece dışarı tıklama ihtiyacı biter)
+            setTimeout(() => resetSettingsTooltip(settingsBtn), 50);
+            return;
+        }
+
+        // --- AÇMA VE KALİTEYE GİRİŞ ---
+        settingsBtn.click();
+
+        let attempts = 0;
+        const check = setInterval(() => {
+            const items = document.querySelectorAll('.ytp-menuitem, [role="menuitem"]');
+            let target = null;
+
+            for (const item of items) {
+                if (/quality|kalite/i.test(item.textContent)) {
+                    target = item;
+                    break;
+                }
+            }
+
+            if (target) {
+                clearInterval(check);
+                target.click();
+
+                setTimeout(() => {
+                    if(target) target.blur();
+                    resetSettingsTooltip(settingsBtn);
+                    // Manuel tooltip temizliği
+                    const tooltips = document.querySelectorAll('.ytp-tooltip');
+                    tooltips.forEach(t => t.style.display = 'none');
+                }, 100);
+            }
+
+            if (++attempts > 20) clearInterval(check);
+        }, 50);
+    }
+
+    window.addEventListener('keydown', (e) => {
+        // Alt + Shift + Q kontrolü
+        if (e.altKey && e.shiftKey && e.key.toLowerCase() === 'q') {
+            const active = document.activeElement;
+            if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable) return;
+
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            openQualityMenu();
+        }
+    }, true);
+})();
