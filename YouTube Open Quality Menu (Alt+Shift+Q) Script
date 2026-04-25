@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         YouTube Open Quality Menu (Alt+Shift+Q)
-// @version      37.1
-// @description  New Design Embed'deki 2. Alt+T ve odaklanma sorununu çözer.
+// @name         YouTube Open Quality Menu (Alt+Q)
+// @version      37.3
+// @description  Fixes focus issues and the Alt+T bug in the New Design Embed. Opens the quality menu directly using Alt+Q.
 // @author       Gemini
 // @match        *://www.youtube.com/*
 // @match        *://www.youtube-nocookie.com/*
@@ -11,7 +11,7 @@
 (function () {
     'use strict';
 
-    // 1. MAVİ KAREYİ VE TOOLTIP BUG'INI CSS İLE ENGELLE
+    // 1. PREVENT BLUE BORDER AND TOOLTIP BUG VIA CSS
     const style = document.createElement('style');
     style.innerHTML = `
         *:focus, .ytp-focused, .ytp-settings-button:focus, .ytp-menuitem:focus {
@@ -25,11 +25,11 @@
     function resetSettingsTooltip(btn) {
         if (!btn) return;
         btn.blur();
-        // Mouse'u butondan çekmişiz gibi yap (Tooltip'i kapatır)
+        // Simulate mouse leave to close the tooltip
         btn.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true, cancelable: true, view: window }));
         btn.setAttribute('aria-expanded', 'false');
 
-        // --- KRİTİK HAMLE: Odağı videonun kendisine ver ---
+        // --- CRITICAL MOVE: Give focus back to the video player itself ---
         const player = document.querySelector('.html5-video-player') || document.querySelector('#movie_player');
         if (player) player.focus();
     }
@@ -41,18 +41,18 @@
 
         if (!settingsBtn) return;
 
-        // --- TOGGLE (Aç/Kapat) ---
+        // --- TOGGLE (Open/Close) ---
         const menu = document.querySelector('.ytp-settings-menu');
         const isMenuOpen = menu && menu.style.display !== 'none';
 
         if (isMenuOpen) {
-            settingsBtn.click(); // Menüyü kapat
-            // Menü kapandıktan sonra odağı videoya kaçır (Böylece dışarı tıklama ihtiyacı biter)
+            settingsBtn.click(); // Close the menu
+            // After closing, shift focus to the video to avoid needing an extra click
             setTimeout(() => resetSettingsTooltip(settingsBtn), 50);
             return;
         }
 
-        // --- AÇMA VE KALİTEYE GİRİŞ ---
+        // --- OPENING AND ENTERING QUALITY SETTINGS ---
         settingsBtn.click();
 
         let attempts = 0;
@@ -61,6 +61,7 @@
             let target = null;
 
             for (const item of items) {
+                // Support for both English and Turkish UI
                 if (/quality|kalite/i.test(item.textContent)) {
                     target = item;
                     break;
@@ -74,7 +75,7 @@
                 setTimeout(() => {
                     if(target) target.blur();
                     resetSettingsTooltip(settingsBtn);
-                    // Manuel tooltip temizliği
+                    // Manual tooltip cleanup
                     const tooltips = document.querySelectorAll('.ytp-tooltip');
                     tooltips.forEach(t => t.style.display = 'none');
                 }, 100);
@@ -85,9 +86,10 @@
     }
 
     window.addEventListener('keydown', (e) => {
-        // Alt + Shift + Q kontrolü
-        if (e.altKey && e.shiftKey && e.key.toLowerCase() === 'q') {
+        // Alt + Q check
+        if (e.altKey && e.key.toLowerCase() === 'q') {
             const active = document.activeElement;
+            // Don't trigger if the user is typing in an input field
             if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable) return;
 
             e.preventDefault();
